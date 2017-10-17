@@ -3,12 +3,13 @@
 #include <iostream>
 #include <thread>
 #include <atomic>
+#include <chrono>
 
 #include <string.h>
 #include <windows.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-
+#include <SOIL.h>
 
 #include "shaders.hpp"
 
@@ -27,13 +28,17 @@ GLuint vertShader, fragShader, defaultProg, VBO, VAO;
 const float quad[] = { 1.0f, 1.0f, 0.0f,  1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f,
 	        1.0f,-1.0f, 0.0f, -1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f };
 
+//uniform names and locations, locations need regrabbed after recompile
+const char* timeHandle = "time";
+GLint timeLoc;
+
 //directory watch and compile
 DWORD dwWaitStatus;
 HANDLE dwChangeHandle;
 
 bool dumpInfo = true;                    //should error info be dumped
 
-std::atomic_bool dirChange(false);       //change in directory seen
+std::atomic_bool dirChange(false);       //change in directory was seen
 
 std::atomic_bool cancelWatch(false);     //used to break from watch thread
 
@@ -49,9 +54,7 @@ bool compileNewFrag(GLuint program) {
   int success, maxLength;
   
   glShaderSource(fragShader, 1, (const GLchar**)&fsc, 0);
-
   glCompileShader(fragShader);
-
   glGetShaderiv(fragShader, GL_COMPILE_STATUS, &success);
 
   if(!success) {
@@ -59,9 +62,7 @@ bool compileNewFrag(GLuint program) {
     if(dumpInfo) {
       
       glGetShaderiv(fragShader, GL_INFO_LOG_LENGTH, &maxLength);
-
       info = (char *)malloc(maxLength);
-
       glGetShaderInfoLog(fragShader, maxLength, &maxLength, info);
 
       std::cout << info << "\n";
@@ -78,7 +79,6 @@ bool compileNewFrag(GLuint program) {
   glBindAttribLocation(program, 0, "aPosition");
 
   glLinkProgram(program);
-
   glGetProgramiv(program, GL_LINK_STATUS, (int *)&success);
 
   if(!success) {
@@ -86,9 +86,7 @@ bool compileNewFrag(GLuint program) {
     if(dumpInfo) {
       
       glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
-
       info = (char *)malloc(maxLength);
-
       glGetProgramInfoLog(program, maxLength, &maxLength, info);
 
       std::cout << info << "\n";
@@ -190,8 +188,6 @@ int initOGL() {
 
   //cleanup
   free(vsc);
-  //glDetachShader(defaultProg, vertShader);
-  //glDetachShader(defaultProg, fragShader);
 
   //prepare geometry
   glGenBuffers(1, &VBO);
@@ -213,6 +209,8 @@ int initOGL() {
 
 int main() {
 
+  auto t_start = std::chrono::high_resolution_clock::now();
+  
   int initStatus = initOGL();
 
   if(initStatus < 0) {
@@ -233,7 +231,7 @@ int main() {
 
   std::cout << "Current dir: " << drive << "\n";
 
-  std::thread watch(watchDirectory, drive);  //directory watch logic, sets shaderCompiled
+  std::thread watch(watchDirectory, drive);  //directory watch logic
   
   //Render Loop
   while(!glfwWindowShouldClose(window)) {
@@ -250,12 +248,22 @@ int main() {
       bool compiled = compileNewFrag(defaultProg);
 
       if(compiled) {
+
+        timeLoc = glGetUniformLocation(defaultProg, timeHandle);
 	
         glUseProgram(defaultProg);
         dumpInfo = true;
       }
     }
+
+    //get time
+    auto t_now = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration_cast<std::chrono::duration<float>>(t_now - t_start).count();
     
+    //fill uniforms if they exist
+    if(timeLoc != -1) glUniform1f(timeLoc, time);
+
+    //draw
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
