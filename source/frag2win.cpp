@@ -42,14 +42,14 @@ GLint resolutionLoc;
 DWORD dwWaitStatus;
 HANDLE dwChangeHandle;
 
-bool dumpInfo = true;                    //should error info be dumped
+//error info should be dumped
+bool dumpInfo = true;
 
-std::atomic_bool dirChange(false);       //change in directory was seen
+//change in directory was seen
+std::atomic_bool dirChange(false);
 
-std::atomic_bool cancelWatch(false);     //used to break from watch thread
-
-//option parsing
-cxxopts::Options options("frag2win", "Renders and recompiles fragment shader");
+//used to break from watch thread
+std::atomic_bool cancelWatch(false);
 
 
 //change frag source and compile without creating or deleting shader handle
@@ -118,7 +118,6 @@ bool compileNewFrag(GLuint program) {
 
 void watchDirectory(LPSTR watchPath) {
 
-  
   dwChangeHandle = FindFirstChangeNotification(watchPath, FALSE, FILE_NOTIFY_CHANGE_LAST_WRITE);
 
   if(dwChangeHandle == INVALID_HANDLE_VALUE) {
@@ -134,7 +133,8 @@ void watchDirectory(LPSTR watchPath) {
 
   while(!cancelWatch) {
 
-    dwWaitStatus = WaitForSingleObject(dwChangeHandle, 5000); //wait on file written signal
+    //wait on file written signal
+    dwWaitStatus = WaitForSingleObject(dwChangeHandle, 5000);
 
     switch (dwWaitStatus) {
 
@@ -254,11 +254,40 @@ int main(int argc, char *argv[]) {
   auto t_start = std::chrono::high_resolution_clock::now();
 
   //option parsing
-  options.add_options()("f,file", "Fragment shader filename", cxxopts::value<std::string>());
-
+  cxxopts::Options options("frag2win", "Renders and recompiles fragment shader");
+  
+  options.add_options()
+    ("f,file", "Fragment shader filename", cxxopts::value<std::string>());
+  options.add_options()
+    ("d,directory", "Directory to watch", cxxopts::value<std::string>());
+  
   options.parse(argc, argv);
 
   if(options.count("f") > 0) fragFilename = options["f"].as<std::string>();
+
+  std::string directoryName;
+
+  LPSTR path;
+  
+  if(options.count("d") > 0) {
+
+    directoryName = options["d"].as<std::string>();
+
+    path = const_cast<char *>(directoryName.c_str());
+    
+  } else {
+
+    //use the directory the program is running from
+    char pathBuffer[MAX_PATH];
+    char trimmedPath[MAX_PATH];
+    char drive[MAX_PATH];
+  
+    GetModuleFileName(NULL, pathBuffer, MAX_PATH);
+    _splitpath_s(pathBuffer, drive, MAX_PATH, trimmedPath, MAX_PATH, NULL, 0, NULL, 0);
+    strcat(drive, trimmedPath);
+
+    path = drive;
+  }
 
   //prep GL
   int initStatus = initOGL();
@@ -269,19 +298,10 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  //prep directory watch
-  char pathBuffer[MAX_PATH];
-  char trimmedPath[MAX_PATH];
-  char drive[4];
-  
-  GetModuleFileName(NULL, pathBuffer, MAX_PATH);
-  _splitpath_s(pathBuffer, drive, 4, trimmedPath, MAX_PATH, NULL, 0, NULL, 0);
-  strcat(drive, trimmedPath);
-
-  std::cout << "Current dir: " << drive << "\n";
-
   //directory watch logic
-  std::thread watch(watchDirectory, drive);  
+  std::cout << "Watching directory: " << path << "\n";
+  
+  std::thread watch(watchDirectory, path);  
 
   //render loop
   while(!glfwWindowShouldClose(window)) {
