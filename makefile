@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -Wall -Wextra -ggdb
 
-LDFLAGS = -lopengl32 -lglew32 -lglfw3 -lpthread -lSOIL -static-libgcc -static-libstdc++
+LDFLAGS = -lSOIL -lopengl32 -lglew32 -lglfw3 -lpthread -static-libgcc -static-libstdc++
 
 TARGET = frag2win
 

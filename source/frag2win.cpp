@@ -24,6 +24,7 @@ const char *fragFilename = "default.frag";
 
 GLchar *vsc, *fsc;
 GLuint vertShader, fragShader, defaultProg, VBO, VAO;
+GLuint tex0;
 
 const float quad[] = { 1.0f, 1.0f, 0.0f,  1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f,
 	        1.0f,-1.0f, 0.0f, -1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f };
@@ -31,6 +32,9 @@ const float quad[] = { 1.0f, 1.0f, 0.0f,  1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f,
 //uniform names and locations, locations need regrabbed after recompile
 const char* timeHandle = "time";
 GLint timeLoc;
+
+const char* resolutionHandle = "resolution";
+GLint resolutionLoc;
 
 //directory watch and compile
 DWORD dwWaitStatus;
@@ -204,6 +208,25 @@ int initOGL() {
   
   glUseProgram(defaultProg);
 
+  //prepare textures
+  glGenTextures(1, &tex0);
+
+  glBindTexture(GL_TEXTURE_2D, tex0);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  //load image into texture
+  int imageW, imageH;
+  unsigned char* image = SOIL_load_image("noise.png", &imageW, &imageH, 0, SOIL_LOAD_RGB);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageW, imageH, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+
+  SOIL_free_image_data(image);
+
   return 0;
 }
 
@@ -250,6 +273,7 @@ int main() {
       if(compiled) {
 
         timeLoc = glGetUniformLocation(defaultProg, timeHandle);
+        resolutionLoc = glGetUniformLocation(defaultProg, resolutionHandle);
 	
         glUseProgram(defaultProg);
         dumpInfo = true;
@@ -262,6 +286,8 @@ int main() {
     
     //fill uniforms if they exist
     if(timeLoc != -1) glUniform1f(timeLoc, time);
+    
+    if(resolutionLoc != -1) glUniform2f(resolutionLoc, (float)width, (float)height);
 
     //draw
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
