@@ -4,12 +4,14 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <string>
 
 #include <string.h>
 #include <windows.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <SOIL.h>
+#include <cxxopts.hpp>
 
 #include "shaders.hpp"
 
@@ -19,8 +21,8 @@ const unsigned int height = 720;
 //GL
 GLFWwindow *window;
 
-const char *vertFilename = "default.vert";
-const char *fragFilename = "default.frag";
+std::string vertFilename = "default.vert";
+std::string fragFilename = "default.frag";
 
 GLchar *vsc, *fsc;
 GLuint vertShader, fragShader, defaultProg, VBO, VAO;
@@ -46,13 +48,16 @@ std::atomic_bool dirChange(false);       //change in directory was seen
 
 std::atomic_bool cancelWatch(false);     //used to break from watch thread
 
+//option parsing
+cxxopts::Options options("frag2win", "Renders and recompiles fragment shader");
+
 
 //change frag source and compile without creating or deleting shader handle
 //link and return true on success
 bool compileNewFrag(GLuint program) {
 
   free(fsc);
-  fsc = Shaders::fileToBuff(fragFilename);
+  fsc = Shaders::fileToBuff(fragFilename.c_str());
 
   char *info;
   int success, maxLength;
@@ -191,8 +196,8 @@ int initOGL() {
   glViewport(0, 0, width, height);
 
   //shaders
-  vsc = Shaders::fileToBuff(vertFilename);
-  fsc = Shaders::fileToBuff(fragFilename);
+  vsc = Shaders::fileToBuff(vertFilename.c_str());
+  fsc = Shaders::fileToBuff(fragFilename.c_str());
 
   vertShader = Shaders::shaderFromSource(vsc, GL_VERTEX_SHADER);
   fragShader = Shaders::shaderFromSource(fsc, GL_FRAGMENT_SHADER);
@@ -242,10 +247,18 @@ int initOGL() {
   return 0;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 
   auto t_start = std::chrono::high_resolution_clock::now();
-  
+
+  //option parsing
+  options.add_options()("f,file", "Fragment shader filename", cxxopts::value<std::string>());
+
+  options.parse(argc, argv);
+
+  if(options.count("f") > 0) fragFilename = options["f"].as<std::string>();
+
+  //prep GL
   int initStatus = initOGL();
 
   if(initStatus < 0) {
@@ -254,21 +267,21 @@ int main() {
     return -1;
   }
 
+  //prep directory watch
   char pathBuffer[MAX_PATH];
   char trimmedPath[MAX_PATH];
   char drive[4];
   
   GetModuleFileName(NULL, pathBuffer, MAX_PATH);
-
   _splitpath_s(pathBuffer, drive, 4, trimmedPath, MAX_PATH, NULL, 0, NULL, 0);
-
   strcat(drive, trimmedPath);
 
   std::cout << "Current dir: " << drive << "\n";
 
-  std::thread watch(watchDirectory, drive);  //directory watch logic
-  
-  //Render Loop
+  //directory watch logic
+  std::thread watch(watchDirectory, drive);  
+
+  //render loop
   while(!glfwWindowShouldClose(window)) {
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -276,6 +289,7 @@ int main() {
       glfwSetWindowShouldClose(window, true);
     }
 
+    //recompile on change flag
     bool expected = true;
     
     if(dirChange.compare_exchange_strong(expected, false)) {
@@ -283,8 +297,6 @@ int main() {
       bool compiled = compileNewFrag(defaultProg);
 
       if(compiled) {
-
-        compiled = false;
 	
         std::cout << "Fragment shader succesfully recompiled" << "\n";
 	
@@ -302,7 +314,6 @@ int main() {
     
     //fill uniforms if they exist
     if(timeLoc != -1) glUniform1f(timeLoc, time);
-    
     if(resolutionLoc != -1) glUniform2f(resolutionLoc, (float)width, (float)height);
 
     //draw

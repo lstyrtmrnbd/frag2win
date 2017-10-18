@@ -8,8 +8,12 @@ GLchar* Shaders::fileToBuff(const char *filename) {
     char *buf;
 
     fptr = fopen(filename, "rb");
-    if(!fptr) return NULL;
+    if(!fptr) {
 
+      std::cout << "Could not open file: " << filename << "\n";
+      return NULL;
+    }
+    
     fseek(fptr, 0, SEEK_END);
 
     length = ftell(fptr);
