@@ -56,6 +56,11 @@ bool compileNewFrag(GLuint program) {
 
   char *info;
   int success, maxLength;
+
+  //glDetachShader(program, fragShader);
+  //glDeleteShader(fragShader);
+
+  //fragShader = glCreateShader(GL_FRAGMENT_SHADER);
   
   glShaderSource(fragShader, 1, (const GLchar**)&fsc, 0);
   glCompileShader(fragShader);
@@ -132,6 +137,13 @@ void watchDirectory(LPSTR watchPath) {
 
 	//change witnessed
 	dirChange = true;
+
+	if(FindNextChangeNotification(dwChangeHandle) == FALSE) {
+
+	  std::cout << "Error: FindNextChangeNotification function failed" << "\n";
+	  ExitProcess(GetLastError());
+	}
+	
 	break;
 
       case WAIT_TIMEOUT:
@@ -264,14 +276,18 @@ int main() {
       glfwSetWindowShouldClose(window, true);
     }
 
-    if(dirChange) {
-
-      dirChange = false;
+    bool expected = true;
+    
+    if(dirChange.compare_exchange_strong(expected, false)) {
       
       bool compiled = compileNewFrag(defaultProg);
 
       if(compiled) {
 
+        compiled = false;
+	
+        std::cout << "Fragment shader succesfully recompiled" << "\n";
+	
         timeLoc = glGetUniformLocation(defaultProg, timeHandle);
         resolutionLoc = glGetUniformLocation(defaultProg, resolutionHandle);
 	
