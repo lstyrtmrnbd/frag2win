@@ -233,12 +233,14 @@ int initOGL() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
   //load image into texture
   int imageW, imageH;
-  unsigned char* image = SOIL_load_image("noise.png", &imageW, &imageH, 0, SOIL_LOAD_RGB);
+  unsigned char* image = SOIL_load_image("tex.png", &imageW, &imageH, 0, SOIL_LOAD_RGB);
+
+  if(image == 0) std::cout << "SOIL image loading error " << SOIL_last_result() << "\n";
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageW, imageH, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
 
