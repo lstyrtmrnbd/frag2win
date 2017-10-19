@@ -21,6 +21,8 @@ const unsigned int height = 720;
 //GL
 GLFWwindow *window;
 
+std::string directoryName = "";
+
 std::string vertFilename = "default.vert";
 std::string fragFilename = "default.frag";
 
@@ -241,7 +243,7 @@ int initOGL() {
     
     glBindTexture(GL_TEXTURE_2D, textures[i]);
 
-    std::string texFilename = texturePrefix + std::to_string(i) + ".png";
+    std::string texFilename = directoryName + texturePrefix + std::to_string(i) + ".png";
 
     std::string texHandle = "tex" + std::to_string(i);
 
@@ -284,8 +286,6 @@ int main(int argc, char *argv[]) {
     ("p,prefix", "Prefix of texture filenames",cxxopts::value<std::string>());
   
   options.parse(argc, argv);
-
-  std::string directoryName;
   
   if(options.count("d") > 0) {
 
