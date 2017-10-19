@@ -26,7 +26,12 @@ std::string fragFilename = "default.frag";
 
 GLchar *vsc, *fsc;
 GLuint vertShader, fragShader, defaultProg, VBO, VAO;
-GLuint tex0;
+
+std::string texturePrefix = "tex";
+
+unsigned int textureUnits = 1;
+
+GLuint *textures;
 
 const float quad[] = { 1.0f, 1.0f, 0.0f,  1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f,
 	        1.0f,-1.0f, 0.0f, -1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f };
@@ -226,26 +231,41 @@ int initOGL() {
   glUseProgram(defaultProg);
 
   //prepare textures
-  glGenTextures(1, &tex0);
+  textures = new GLuint[textureUnits];
+  
+  glGenTextures(textureUnits, textures);
 
-  glBindTexture(GL_TEXTURE_2D, tex0);
+  for(int i = 0; i < textureUnits; i++) {
 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glActiveTexture(GL_TEXTURE0 + i);
+    
+    glBindTexture(GL_TEXTURE_2D, textures[i]);
 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-  //load image into texture
-  int imageW, imageH;
-  unsigned char* image = SOIL_load_image("tex.png", &imageW, &imageH, 0, SOIL_LOAD_RGB);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  if(image == 0) std::cout << "SOIL image loading error " << SOIL_last_result() << "\n";
+    std::string texFilename = texturePrefix + std::to_string(i) + ".png";
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageW, imageH, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    std::string texHandle = "tex" + std::to_string(i);
 
-  SOIL_free_image_data(image);
+    std::cout << "Loading " << texFilename << " and binding to uniform " << texHandle << "\n";
 
+    //load image into texture
+    int imageW, imageH;
+    unsigned char* image = SOIL_load_image(texFilename.c_str(), &imageW, &imageH, 0, SOIL_LOAD_RGB);
+
+    if(image == 0) std::cout << "SOIL image loading error " << SOIL_last_result() << "\n";
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageW, imageH, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+
+    glUniform1i(glGetUniformLocation(defaultProg, texHandle.c_str()), i);
+
+    SOIL_free_image_data(image); 
+  }
+  
   return 0;
 }
 
@@ -257,9 +277,10 @@ int main(int argc, char *argv[]) {
   cxxopts::Options options("frag2win", "Renders and recompiles fragment shader");
   
   options.add_options()
-    ("f,file", "Fragment shader filename", cxxopts::value<std::string>());
-  options.add_options()
-    ("d,directory", "Directory to watch", cxxopts::value<std::string>());
+    ("f,file", "Fragment shader filename", cxxopts::value<std::string>())
+    ("d,directory", "Directory to watch", cxxopts::value<std::string>())
+    ("t,texunits", "Amount of textures",cxxopts::value<int>())
+    ("p,prefix", "Prefix of texture filenames",cxxopts::value<std::string>());
   
   options.parse(argc, argv);
 
@@ -289,6 +310,10 @@ int main(int argc, char *argv[]) {
     path = drive;
   }
 
+  if(options.count("t") > 0) textureUnits = options["t"].as<int>();
+
+  if(options.count("p") > 0) texturePrefix = options["p"].as<std::string>();
+  
   //prep GL
   int initStatus = initOGL();
 
@@ -347,6 +372,8 @@ int main(int argc, char *argv[]) {
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
+
+  std::cout << "Waiting on directory watch timeout, now closing..." << "\n";
 
   cancelWatch = true;
   watch.join();
