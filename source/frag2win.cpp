@@ -241,12 +241,6 @@ int initOGL() {
     
     glBindTexture(GL_TEXTURE_2D, textures[i]);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
     std::string texFilename = texturePrefix + std::to_string(i) + ".png";
 
     std::string texHandle = "tex" + std::to_string(i);
@@ -261,9 +255,15 @@ int initOGL() {
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageW, imageH, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
 
+    SOIL_free_image_data(image);
+    
     glUniform1i(glGetUniformLocation(defaultProg, texHandle.c_str()), i);
 
-    SOIL_free_image_data(image); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   }
   
   return 0;
@@ -278,38 +278,36 @@ int main(int argc, char *argv[]) {
   
   options.add_options()
     ("f,file", "Fragment shader filename", cxxopts::value<std::string>())
-    ("d,directory", "Directory to watch", cxxopts::value<std::string>())
+    ("d,directory", "Directory to watch, terminated with appropriate directory separator",
+       cxxopts::value<std::string>())
     ("t,texunits", "Amount of textures",cxxopts::value<int>())
     ("p,prefix", "Prefix of texture filenames",cxxopts::value<std::string>());
   
   options.parse(argc, argv);
 
-  if(options.count("f") > 0) fragFilename = options["f"].as<std::string>();
-
   std::string directoryName;
-
-  LPSTR path;
   
   if(options.count("d") > 0) {
 
     directoryName = options["d"].as<std::string>();
-
-    path = const_cast<char *>(directoryName.c_str());
     
   } else {
 
     //use the directory the program is running from
     char pathBuffer[MAX_PATH];
-    char trimmedPath[MAX_PATH];
-    char drive[MAX_PATH];
   
     GetModuleFileName(NULL, pathBuffer, MAX_PATH);
-    _splitpath_s(pathBuffer, drive, MAX_PATH, trimmedPath, MAX_PATH, NULL, 0, NULL, 0);
-    strcat(drive, trimmedPath);
 
-    path = drive;
+    directoryName = pathBuffer;
+    directoryName = directoryName.substr(0, directoryName.find_last_of("\\") + 1);
   }
 
+  if(options.count("f") > 0) fragFilename = options["f"].as<std::string>();
+
+  fragFilename = directoryName + fragFilename;
+
+  std::cout << "Fragment rendered: '" << fragFilename << "'\n";
+  
   if(options.count("t") > 0) textureUnits = options["t"].as<int>();
 
   if(options.count("p") > 0) texturePrefix = options["p"].as<std::string>();
@@ -324,7 +322,9 @@ int main(int argc, char *argv[]) {
   }
 
   //directory watch logic
-  std::cout << "Watching directory: " << path << "\n";
+  LPSTR path = const_cast<char *>(directoryName.c_str());
+
+  std::cout << "Watching directory: '" << path << "'\n";
   
   std::thread watch(watchDirectory, path);  
 
@@ -346,11 +346,22 @@ int main(int argc, char *argv[]) {
       if(compiled) {
 	
         std::cout << "Fragment shader succesfully recompiled" << "\n";
-	
+		
+        glUseProgram(defaultProg);
+
         timeLoc = glGetUniformLocation(defaultProg, timeHandle);
         resolutionLoc = glGetUniformLocation(defaultProg, resolutionHandle);
-	
-        glUseProgram(defaultProg);
+
+        //rebind texture uniforms
+        for(int i = 0; i < textureUnits; i++) {
+
+          std::string texHandle = "tex" + std::to_string(i);
+      
+          glActiveTexture(GL_TEXTURE0 + i);
+          glBindTexture(GL_TEXTURE_2D, textures[i]);
+          glUniform1i(glGetUniformLocation(defaultProg, texHandle.c_str()), i);
+        }
+
         dumpInfo = true;
       }
     }
@@ -379,6 +390,8 @@ int main(int argc, char *argv[]) {
   watch.join();
   
   glDeleteBuffers(1, &VBO);
+
+  delete [] textures;
   
   glfwTerminate();
   return 0;
