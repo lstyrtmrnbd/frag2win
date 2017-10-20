@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <string>
+#include <cmath>
 
 #include <string.h>
 #include <windows.h>
@@ -44,6 +45,11 @@ GLint timeLoc;
 
 const char* resolutionHandle = "resolution";
 GLint resolutionLoc;
+
+const char* oscHandle = "osc";
+GLint oscLoc;
+
+unsigned int bpm;
 
 //directory watch and compile
 DWORD dwWaitStatus;
@@ -282,8 +288,10 @@ int main(int argc, char *argv[]) {
     ("f,file", "Fragment shader filename", cxxopts::value<std::string>())
     ("d,directory", "Directory to watch, terminated with appropriate directory separator",
        cxxopts::value<std::string>())
-    ("t,texunits", "Amount of textures",cxxopts::value<int>())
-    ("p,prefix", "Prefix of texture filenames",cxxopts::value<std::string>());
+    ("t,texunits", "Amount of textures" ,cxxopts::value<int>())
+    ("p,prefix", "Prefix of texture filenames", cxxopts::value<std::string>())
+    ("b,bpm","Provide the oscillator uniform with a bpm value", cxxopts::value<int>())
+    ("h,hz","Provide the oscillator uniform with a Hz value", cxxopts::value<int>());
   
   options.parse(argc, argv);
   
@@ -311,6 +319,17 @@ int main(int argc, char *argv[]) {
   if(options.count("t") > 0) textureUnits = options["t"].as<int>();
 
   if(options.count("p") > 0) texturePrefix = options["p"].as<std::string>();
+
+  //if both are provided for some reason then --bpm will take precedence
+  if(options.count("h") > 0) {
+
+    bpm = options["h"].as<int>() * 60; //1 hz = 60 bpm
+  }
+  
+  if(options.count("b") > 0) {
+
+    bpm = options["b"].as<int>();
+  }
   
   //prep GL
   int initStatus = initOGL();
@@ -351,6 +370,7 @@ int main(int argc, char *argv[]) {
 
         timeLoc = glGetUniformLocation(defaultProg, timeHandle);
         resolutionLoc = glGetUniformLocation(defaultProg, resolutionHandle);
+        oscLoc = glGetUniformLocation(defaultProg, oscHandle);
 
         //rebind texture uniforms
         for(int i = 0; i < textureUnits; i++) {
@@ -369,10 +389,14 @@ int main(int argc, char *argv[]) {
     //get time
     auto t_now = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration_cast<std::chrono::duration<float>>(t_now - t_start).count();
+
+    float Hz = (float)bpm / 60.0f;
+    float osc = (sin((time / (M_PI * 2.0)) * Hz) / 2.0) + 0.5;
     
     //fill uniforms if they exist
     if(timeLoc != -1) glUniform1f(timeLoc, time);
     if(resolutionLoc != -1) glUniform2f(resolutionLoc, (float)width, (float)height);
+    if(oscLoc != -1) glUniform1f(oscLoc, osc);
 
     //draw
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
