@@ -40,14 +40,17 @@ const float quad[] = { 1.0f, 1.0f, 0.0f,  1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f,
 	        1.0f,-1.0f, 0.0f, -1.0f, -1.0f, 0.0f,  -1.0f, 1.0f, 0.0f };
 
 //uniform names and locations, locations need regrabbed after recompile
-const char* timeHandle = "time";
+const char *timeHandle = "time";
 GLint timeLoc;
 
-const char* resolutionHandle = "resolution";
+const char *resolutionHandle = "resolution";
 GLint resolutionLoc;
 
-const char* oscHandle = "osc";
+const char *oscHandle = "osc";
 GLint oscLoc;
+
+const char *hzHandle = "hz"; 
+GLint hzLoc;
 
 unsigned int bpm;
 
@@ -371,6 +374,7 @@ int main(int argc, char *argv[]) {
         timeLoc = glGetUniformLocation(defaultProg, timeHandle);
         resolutionLoc = glGetUniformLocation(defaultProg, resolutionHandle);
         oscLoc = glGetUniformLocation(defaultProg, oscHandle);
+        hzLoc = glGetUniformLocation(defaultProg, hzHandle);
 
         //rebind texture uniforms
         for(int i = 0; i < textureUnits; i++) {
@@ -391,12 +395,13 @@ int main(int argc, char *argv[]) {
     float time = std::chrono::duration_cast<std::chrono::duration<float>>(t_now - t_start).count();
 
     float Hz = (float)bpm / 60.0f;
-    float osc = (sin((time / (M_PI * 2.0)) * Hz) / 2.0) + 0.5;
+    float osc = (sin(time * (M_PI * 2.0) * Hz) / 2.0) + 0.5;
     
     //fill uniforms if they exist
     if(timeLoc != -1) glUniform1f(timeLoc, time);
     if(resolutionLoc != -1) glUniform2f(resolutionLoc, (float)width, (float)height);
     if(oscLoc != -1) glUniform1f(oscLoc, osc);
+    if(hzLoc != -1) glUniform1f(hzLoc, Hz);
 
     //draw
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
