@@ -241,6 +241,11 @@ int initOGL() {
   
   glUseProgram(defaultProg);
 
+  timeLoc = glGetUniformLocation(defaultProg, timeHandle);
+  resolutionLoc = glGetUniformLocation(defaultProg, resolutionHandle);
+  oscLoc = glGetUniformLocation(defaultProg, oscHandle);
+  hzLoc = glGetUniformLocation(defaultProg, hzHandle);
+
   //prepare textures
   textures = new GLuint[textureUnits];
   
